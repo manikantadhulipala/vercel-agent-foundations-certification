@@ -4,8 +4,10 @@ import {
   createUIMessageStreamResponse,
   safeValidateUIMessages,
   type UIMessage,
+  type UIMessageChunk,
 } from "ai";
 import { getRun } from "workflow/api";
+import { RUN_FAILED_MESSAGE } from "./messages";
 
 /*
  * Shared HTTP plumbing for both chat endpoints. Keeps request validation and
@@ -69,13 +71,55 @@ function skipChunks<T>(count: number): TransformStream<T, T> {
   });
 }
 
+
+type RunStatusSource = { status: Promise<string> };
+
+/** Waits briefly for the run to settle after its stream closes. */
+async function finalStatus(run: RunStatusSource): Promise<string> {
+  let status = await run.status;
+  for (let i = 0; i < 10 && (status === "running" || status === "pending"); i++) {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    status = await run.status;
+  }
+  return status;
+}
+
+/**
+ * A failed run (for example a model call that kept failing after its retries)
+ * still ends its stream normally, so the chat would just stop. This holds the
+ * closing `finish` chunk until the run settles and, if it failed, adds an
+ * error first, so the chat shows the problem and offers a retry.
+ */
+function surfaceRunFailure(run: RunStatusSource): TransformStream<UIMessageChunk, UIMessageChunk> {
+  let finish: UIMessageChunk | null = null;
+  return new TransformStream<UIMessageChunk, UIMessageChunk>({
+    transform(chunk, controller) {
+      if (chunk.type === "finish") finish = chunk;
+      else controller.enqueue(chunk);
+    },
+    async flush(controller) {
+      try {
+        if ((await finalStatus(run)) === "failed") {
+          controller.enqueue({ type: "error", errorText: RUN_FAILED_MESSAGE });
+        }
+      } catch {
+        // Status unavailable: fall through and close normally.
+      }
+      if (finish) controller.enqueue(finish);
+    },
+  });
+}
+
 /** Response for a freshly started run, with the header `WorkflowChatTransport` needs. */
 export function runStreamResponse(run: {
   runId: string;
   readable: ReadableStream;
+  status: Promise<string>;
 }): Response {
   return createUIMessageStreamResponse({
-    stream: run.readable.pipeThrough(createModelCallToUIChunkTransform()),
+    stream: run.readable
+      .pipeThrough(createModelCallToUIChunkTransform())
+      .pipeThrough(surfaceRunFailure(run)),
     headers: { "x-workflow-run-id": run.runId },
   });
 }
@@ -110,7 +154,8 @@ export async function resumeRunStream(
     const readable = run
       .getReadable({ startIndex: 0 })
       .pipeThrough(createModelCallToUIChunkTransform())
-      .pipeThrough(skipChunks(startIndex));
+      .pipeThrough(skipChunks(startIndex))
+      .pipeThrough(surfaceRunFailure(run));
     return createUIMessageStreamResponse({
       stream: readable,
       headers: { "x-workflow-run-id": runId },
