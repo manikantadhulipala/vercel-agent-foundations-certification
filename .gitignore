@@ -26,3 +26,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 /.swc
+
+# keep the redacted env template
+!.env.example
