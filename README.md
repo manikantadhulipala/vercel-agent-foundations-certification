@@ -125,7 +125,7 @@ components/admin/tool-views.tsx         admin data, sandbox and memory views
 
 ## Notes and limitations
 
-- **Return decisions locally:** the store calls the webhook at the deployment URL. On `localhost` it can't reach your machine, so the workflow falls back to polling the return status every minute.
+- **Return decision callbacks:** in production the callback URL uses the public production domain, because per-deployment URLs sit behind Vercel Deployment Protection and would redirect the store's callback to a login page. On `localhost` and protected preview deployments the store can't reach the app, so the workflow falls back to polling the return status every minute.
 - **Resumable streams** replay the run from the start on the server and skip the chunks the browser already rendered, because the run stores raw model parts while the browser counts UI chunks. This keeps resumed replies exact.
 - **Admin auth** is the template's demo cookie gate. It now also protects the admin API routes; real deployments should replace it with proper authentication.
 - **Model:** `openai/gpt-5-mini` is used because it's available on AI Gateway's free tier with reliable tool calling. Set `AI_MODEL` to change it.
