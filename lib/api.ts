@@ -254,6 +254,28 @@ export async function getProducts(
   });
 }
 
+/**
+ * Same query as `getProducts`, but keeps the pagination metadata so callers
+ * (the shopping agent) can page through the full catalog. Not cached: agent
+ * tool calls run inside workflow steps, outside the request cache.
+ */
+export async function getProductsPage(
+  params: GetProductsParams = {},
+): Promise<{ data: Product[]; meta: { pagination: PaginationMeta } }> {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set("page", String(params.page));
+  if (params.limit) qs.set("limit", String(params.limit));
+  if (params.category) qs.set("category", params.category);
+  if (params.search) qs.set("search", params.search);
+  if (params.featured !== undefined)
+    qs.set("featured", params.featured ? "true" : "false");
+
+  const path = qs.toString() ? `/products?${qs}` : "/products";
+  return requestWithMeta<Product[], { pagination: PaginationMeta }>(path, {
+    cache: "no-store",
+  });
+}
+
 export async function getProductById(idOrSlug: string): Promise<Product> {
   return request<Product>(`/products/${encodeURIComponent(idOrSlug)}`, {
     next: {
@@ -378,6 +400,13 @@ export async function createReturn(input: CreateReturnInput): Promise<Return> {
   return request<Return>("/returns", {
     method: "POST",
     body: input,
+    cache: "no-store",
+  });
+}
+
+/** Poll a return's status. Used to verify webhook callbacks before trusting them. */
+export async function getReturn(id: string): Promise<Return> {
+  return request<Return>(`/returns/${encodeURIComponent(id)}`, {
     cache: "no-store",
   });
 }
