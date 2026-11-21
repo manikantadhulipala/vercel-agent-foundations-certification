@@ -98,12 +98,30 @@ async function preauthorizeRefundStep(
   }
 }
 
+/**
+ * On Vercel, `webhook.url` points at this deployment's unique URL, which
+ * Deployment Protection puts behind a login, so the store's callback would be
+ * redirected and never arrive. In production, send it to the public production
+ * domain instead; webhook tokens are resolved by the Workflow service, not by
+ * a specific deployment. Elsewhere (local, protected previews) the status
+ * polling below still delivers the decision.
+ */
+function publicCallbackUrl(webhookUrl: string): string {
+  const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (process.env.VERCEL_ENV !== "production" || !productionHost) return webhookUrl;
+  const url = new URL(webhookUrl);
+  return `https://${productionHost}${url.pathname}${url.search}`;
+}
+
 async function fileReturnStep(
   request: ReturnRequest & { callback: string },
 ): Promise<{ returnId: string }> {
   "use step";
   try {
-    const created = await createReturn(request);
+    const created = await createReturn({
+      ...request,
+      callback: publicCallbackUrl(request.callback),
+    });
     return { returnId: created.id };
   } catch (error) {
     if (!isTransient(error)) {
