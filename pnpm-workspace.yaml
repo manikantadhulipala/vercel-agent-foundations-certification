@@ -1,0 +1,21 @@
+minimumReleaseAgeExclude:
+  - '@ai-sdk/gateway@4.0.152'
+  - '@ai-sdk/workflow@2.0.111'
+  - '@workflow/astro@5.0.13'
+  - '@workflow/builders@5.1.4'
+  - '@workflow/cli@5.3.1'
+  - '@workflow/core@5.7.1'
+  - '@workflow/errors@5.1.5'
+  - '@workflow/nest@5.1.11'
+  - '@workflow/next@5.1.4'
+  - '@workflow/nitro@5.0.13'
+  - '@workflow/nuxt@5.0.13'
+  - '@workflow/rollup@5.0.13'
+  - '@workflow/sveltekit@5.0.13'
+  - '@workflow/vite@5.0.13'
+  - '@workflow/web@5.3.1'
+  - '@workflow/world-local@5.5.1'
+  - '@workflow/world-vercel@5.7.1'
+  - ai@7.0.179
+  - workflow@5.7.1
+  - '@ai-sdk/react@4.0.183'

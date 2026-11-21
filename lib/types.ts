@@ -1,6 +1,9 @@
+// Matches the live API: demo orders 11111–33333 are "fulfilled" (returnable),
+// 44444 is "paid" and 55555 is "cancelled".
 export type OrderStatus =
   | "pending"
   | "paid"
+  | "fulfilled"
   | "shipped"
   | "delivered"
   | "cancelled";
@@ -123,6 +126,8 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  /** The live API embeds the product on each order line. */
+  product?: Pick<Product, "id" | "name" | "slug" | "images" | "category">;
 }
 
 export interface Order {
