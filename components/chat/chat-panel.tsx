@@ -23,6 +23,7 @@ import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { Button } from "@/components/ui/button";
 import { ToolPending, ToolProblem } from "@/components/chat/tool-states";
 import { useDurableChat } from "@/components/chat/use-durable-chat";
+import { CONNECTION_FAILED_MESSAGE, RUN_FAILED_MESSAGE } from "@/lib/agents/messages";
 
 /*
  * Shared chat UI for both agents: conversation, progress, interruption and
@@ -148,7 +149,9 @@ export function ChatPanel<M extends UIMessage>({
             <div className="space-y-2">
               <ToolProblem
                 reason="unavailable"
-                message="The assistant couldn't respond. Check your connection and try again."
+                message={
+                  error.message === RUN_FAILED_MESSAGE ? RUN_FAILED_MESSAGE : CONNECTION_FAILED_MESSAGE
+                }
               />
               <Button
                 type="button"

@@ -2,8 +2,9 @@ import { withWorkflow } from "workflow/next";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Type errors fail the build (the codebase type-checks cleanly).
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   serverExternalPackages: ["@vercel/oidc"],
   images: {

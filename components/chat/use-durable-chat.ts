@@ -49,6 +49,23 @@ function writeStored<M>(key: string, value: StoredChat<M>): void {
   }
 }
 
+// Stay well under the server's limits (60 messages, 512 KB) so long
+// conversations keep working; the newest context matters most.
+const MAX_SENT_MESSAGES = 40;
+const MAX_SENT_BYTES = 400_000;
+
+/**
+ * The most recent slice of the conversation that fits the request limits,
+ * always starting at a user message so the model sees a coherent history.
+ */
+export function trimHistory<M extends UIMessage>(messages: M[]): M[] {
+  let start = Math.max(0, messages.length - MAX_SENT_MESSAGES);
+  const sizeOf = (from: number) => JSON.stringify(messages.slice(from)).length;
+  while (start < messages.length - 1 && sizeOf(start) > MAX_SENT_BYTES) start++;
+  while (start < messages.length - 1 && messages[start].role !== "user") start++;
+  return messages.slice(start);
+}
+
 /** Messages up to and including the last user message. */
 function upToLastUserMessage<M extends UIMessage>(messages: M[]): M[] {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -81,6 +98,10 @@ export function useDurableChat<M extends UIMessage>({
         onChatEnd: () => {
           activeRunId.current = null;
         },
+        prepareSendMessagesRequest: ({ messages, body, headers }) => ({
+          body: { ...body, messages: trimHistory(messages) },
+          headers,
+        }),
         prepareReconnectToStreamRequest: ({ api: defaultApi }) => ({
           api: activeRunId.current
             ? `${api}/${encodeURIComponent(activeRunId.current)}/stream`
