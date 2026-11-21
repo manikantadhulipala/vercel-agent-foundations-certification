@@ -6,6 +6,10 @@ import { ADMIN_COOKIE_NAME, ADMIN_PASSWORD } from "./admin-auth";
 
 const COOKIE_MAX_AGE = 60 * 60 * 24; // 1 day
 
+// Scoped to "/" (not "/admin") so the admin agent's API routes under
+// /api/admin also receive the session and can reject anonymous callers.
+const COOKIE_PATH = "/";
+
 export async function loginAction(formData: FormData): Promise<void> {
   const password = formData.get("password");
   if (typeof password !== "string" || password !== ADMIN_PASSWORD) {
@@ -17,13 +21,15 @@ export async function loginAction(formData: FormData): Promise<void> {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     maxAge: COOKIE_MAX_AGE,
-    path: "/admin",
+    path: COOKIE_PATH,
   });
   redirect("/admin");
 }
 
 export async function logoutAction(): Promise<void> {
   const store = await cookies();
-  store.delete(ADMIN_COOKIE_NAME);
+  store.delete({ name: ADMIN_COOKIE_NAME, path: COOKIE_PATH });
+  // Clear sessions created before the cookie path changed.
+  store.delete({ name: ADMIN_COOKIE_NAME, path: "/admin" });
   redirect("/admin/login");
 }
