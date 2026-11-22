@@ -19,3 +19,10 @@ minimumReleaseAgeExclude:
   - ai@7.0.179
   - workflow@5.7.1
   - '@ai-sdk/react@4.0.183'
+
+# These packages ship prebuilt platform binaries, so their install scripts
+# aren't needed; skip them explicitly (CI rejects unreviewed build scripts).
+allowBuilds:
+  '@swc/core': false
+  cbor-extract: false
+  esbuild: false
