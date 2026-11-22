@@ -1,7 +1,7 @@
 import { WorkflowAgent, type ModelCallStreamPart } from "@ai-sdk/workflow";
 import { convertToModelMessages, isStepCount, type UIMessage } from "ai";
 import { getWritable } from "workflow";
-import { MODEL_MAX_RETRIES } from "./agent-runtime";
+import { MODEL_MAX_RETRIES, providerOptionsFor } from "./agent-runtime";
 import { buildAdminInstructions } from "@/lib/agents/admin/instructions";
 import { loadMemoryStep } from "@/lib/agents/admin/steps";
 import { adminTools } from "@/lib/agents/admin/tools";
@@ -32,6 +32,7 @@ export async function adminChatWorkflow(
       memoryAvailable: memory.available,
     }),
     maxRetries: MODEL_MAX_RETRIES,
+    providerOptions: providerOptionsFor(options.model),
     tools: adminTools,
     // Guarantee a written answer: near the step limit, stop calling tools
     // and summarize what was found (and what couldn't be computed).
