@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { WorkflowChatTransport } from "@ai-sdk/workflow/client";
 import type { UIMessage } from "ai";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 /*
  * `useChat` wired to a durable workflow backend, with recovery.
@@ -74,42 +74,87 @@ function upToLastUserMessage<M extends UIMessage>(messages: M[]): M[] {
   return [];
 }
 
+/**
+ * Per-chat bookkeeping that lives with the transport, outside React state:
+ * which run is streaming, and whether the saved conversation was restored.
+ */
+class ChatSession {
+  private runId: string | null = null;
+  private isRestored = false;
+  private skipSave = false;
+
+  get activeRunId(): string | null {
+    return this.runId;
+  }
+
+  get restored(): boolean {
+    return this.isRestored;
+  }
+
+  setActiveRun(runId: string | null): void {
+    this.runId = runId;
+  }
+
+  /** Records that storage was read; `hadData` means a save would race the restore. */
+  markRestored(hadData: boolean): void {
+    this.isRestored = true;
+    this.skipSave = hadData;
+  }
+
+  /** True once, for the save that runs in the same commit as the restore. */
+  consumeSkipSave(): boolean {
+    const skip = this.skipSave;
+    this.skipSave = false;
+    return skip;
+  }
+}
+
+function createTransport<M extends UIMessage>(api: string, session: ChatSession) {
+  return new WorkflowChatTransport<M>({
+    api,
+    maxConsecutiveErrors: 5,
+    onChatSendMessage: (response) => {
+      session.setActiveRun(response.headers.get("x-workflow-run-id"));
+    },
+    onChatEnd: () => session.setActiveRun(null),
+    prepareSendMessagesRequest: ({ messages, body, headers }) => ({
+      body: { ...body, messages: trimHistory(messages) },
+      headers,
+    }),
+    prepareReconnectToStreamRequest: ({ api: defaultApi }) => ({
+      api: session.activeRunId
+        ? `${api}/${encodeURIComponent(session.activeRunId)}/stream`
+        : defaultApi,
+    }),
+  });
+}
+
+const subscribeNever = () => () => {};
+
+/** False during server rendering and hydration, true afterwards. */
+function useIsClient(): boolean {
+  return useSyncExternalStore(
+    subscribeNever,
+    () => true,
+    () => false,
+  );
+}
+
 export function useDurableChat<M extends UIMessage>({
   api,
   storageKey,
 }: {
-  /** POST endpoint; reconnects go to `${api}/${runId}/stream`. */
+  /** POST endpoint; reconnects go to `${api}/${runId}/stream`. Fixed per chat. */
   api: string;
   /** localStorage key, unique per agent so conversations stay separate. */
   storageKey: string;
 }) {
-  const activeRunId = useRef<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
-  const [resuming, setResuming] = useState(false);
-
-  const transport = useMemo(
-    () =>
-      new WorkflowChatTransport<M>({
-        api,
-        maxConsecutiveErrors: 5,
-        onChatSendMessage: (response) => {
-          activeRunId.current = response.headers.get("x-workflow-run-id");
-        },
-        onChatEnd: () => {
-          activeRunId.current = null;
-        },
-        prepareSendMessagesRequest: ({ messages, body, headers }) => ({
-          body: { ...body, messages: trimHistory(messages) },
-          headers,
-        }),
-        prepareReconnectToStreamRequest: ({ api: defaultApi }) => ({
-          api: activeRunId.current
-            ? `${api}/${encodeURIComponent(activeRunId.current)}/stream`
-            : defaultApi,
-        }),
-      }),
-    [api],
-  );
+  const isClient = useIsClient();
+  // Created once: the transport and its session outlive re-renders.
+  const [{ session, transport }] = useState(() => {
+    const session = new ChatSession();
+    return { session, transport: createTransport<M>(api, session) };
+  });
 
   // A stable id per agent: changing it would recreate the chat instance and
   // drop the restored messages.
@@ -120,59 +165,53 @@ export function useDurableChat<M extends UIMessage>({
   });
   const { messages, setMessages, status, resumeStream } = chat;
 
-  // Restore the saved conversation, then reconnect to any in-flight run.
+  // On load: restore the saved conversation, then reconnect to any run that
+  // was still streaming when the page went away.
   useEffect(() => {
     const stored = readStored<M>(storageKey);
-    if (stored) {
-      activeRunId.current = stored.activeRunId;
-      setMessages(stored.messages);
+    session.markRestored(stored !== null);
+    if (!stored) return;
+    session.setActiveRun(stored.activeRunId);
+    setMessages(stored.messages);
+    if (stored.activeRunId) {
+      resumeStream().catch(() => {
+        // The run is gone (expired or never started): drop the stale pointer.
+        session.setActiveRun(null);
+      });
     }
-    setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
   }, [storageKey]);
-
-  useEffect(() => {
-    if (!hydrated || !activeRunId.current) return;
-    setResuming(true);
-    resumeStream()
-      .catch(() => {
-        // The run is gone (expired or never started): drop the stale pointer.
-        activeRunId.current = null;
-      })
-      .finally(() => setResuming(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, after restore
-  }, [hydrated]);
 
   // Persist after every change. While a reply streams, save only the user's
   // side; the reply itself lives in the durable run until it finishes.
   useEffect(() => {
-    if (!hydrated) return;
+    if (!session.restored || session.consumeSkipSave()) return;
     const inFlight = status === "submitted" || status === "streaming";
     writeStored<M>(storageKey, {
       version: STORAGE_VERSION,
       messages: inFlight ? upToLastUserMessage(messages) : messages,
-      activeRunId: inFlight ? activeRunId.current : null,
+      activeRunId: inFlight ? session.activeRunId : null,
     });
-  }, [hydrated, messages, status, storageKey]);
+  }, [messages, status, storageKey, session]);
 
   const reset = useCallback(() => {
     chat.stop();
-    activeRunId.current = null;
+    session.setActiveRun(null);
     setMessages([]);
     writeStored<M>(storageKey, {
       version: STORAGE_VERSION,
       messages: [],
       activeRunId: null,
     });
-  }, [chat, setMessages, storageKey]);
+  }, [chat, session, setMessages, storageKey]);
+
+  const busy = status === "submitted" || status === "streaming";
+  /** Reconnecting to a run that was streaming before the page reloaded. */
+  const resuming = busy && messages.at(-1)?.role === "user" && session.activeRunId !== null;
 
   /** The last user message never got a reply (e.g. refreshed before it started). */
   const interrupted =
-    hydrated &&
-    !resuming &&
-    status === "ready" &&
-    messages.length > 0 &&
-    messages.at(-1)?.role === "user";
+    isClient && status === "ready" && messages.length > 0 && messages.at(-1)?.role === "user";
 
-  return { ...chat, hydrated, resuming, interrupted, reset };
+  return { ...chat, hydrated: isClient, resuming, interrupted, reset };
 }

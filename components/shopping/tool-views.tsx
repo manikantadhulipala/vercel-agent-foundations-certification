@@ -217,7 +217,7 @@ export function ReturnConfirmation({
       </ul>
       <p className="text-xs text-muted-foreground">Reason: {reason}</p>
       <ol className="list-inside list-decimal space-y-0.5 text-xs text-muted-foreground">
-        <li>We'll email you that your return is being processed.</li>
+        <li>{"We'll email you that your return is being processed."}</li>
         <li>Your refund is pre-authorized.</li>
         <li>The store reviews the return, usually within a few minutes.</li>
       </ol>
