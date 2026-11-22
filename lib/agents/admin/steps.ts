@@ -26,8 +26,11 @@ import {
  * computed there (see the bash tool) instead of by the model.
  */
 
-/** Rows shown to the model inline; the full dataset lives in the sandbox. */
-const PREVIEW_ROWS = 25;
+/**
+ * Rows shown to the model inline; the full dataset lives in the sandbox.
+ * 40 covers catalog-sized datasets (every product) in full.
+ */
+const PREVIEW_ROWS = 40;
 
 export interface DatasetResult<Row> {
   dataset: string;
@@ -40,6 +43,8 @@ export interface DatasetResult<Row> {
   totalRows: number;
   rows: Row[];
   previewOnly: boolean;
+  /** Present when rows are partial, so the model never treats missing rows as zero. */
+  note?: string;
 }
 
 function cleanFilters(params: object): Record<string, string | number | boolean> {
@@ -75,7 +80,7 @@ function datasetFile(dataset: string, filters: Record<string, unknown>): string 
 async function saveDataset(
   dataset: string,
   filters: Record<string, unknown>,
-  payload: { meta: unknown; data: unknown[] },
+  payload: { meta: unknown; rows: unknown[] },
 ): Promise<string | null> {
   try {
     const file = datasetFile(dataset, filters);
@@ -99,7 +104,8 @@ async function fetchDataset<Row, Meta>(
   const filters = cleanFilters(params);
   try {
     const { data, meta } = await fetcher();
-    const file = await saveDataset(dataset, filters, { meta, data });
+    // Saved under the same "rows" key the model sees in the tool result.
+    const file = await saveDataset(dataset, filters, { meta, rows: data });
     return {
       ok: true,
       dataset,
@@ -110,6 +116,9 @@ async function fetchDataset<Row, Meta>(
       totalRows: data.length,
       rows: data.slice(0, PREVIEW_ROWS),
       previewOnly: data.length > PREVIEW_ROWS,
+      ...(data.length > PREVIEW_ROWS && {
+        note: `Only the first ${PREVIEW_ROWS} of ${data.length} rows are shown here. A product or record missing from these rows is NOT zero or absent: compute from the full file with the bash tool.`,
+      }),
     };
   } catch (error) {
     if (isTransient(error)) throw error;

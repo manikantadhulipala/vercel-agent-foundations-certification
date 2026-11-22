@@ -30,8 +30,10 @@ export function buildAdminInstructions({
 
 ## Compute in the sandbox, not in your head
 - Every data tool saves its full result as JSON in the sandbox and returns the file path in "file". Previews may be partial ("previewOnly": true).
-- Each file is one JSON object: {"dataset", "filters", "fetchedAt", "meta", "data"}. The rows are in "data", and each row has the field paths listed in the tool result's "fields" (for example "items[].productId" is a list of objects). Read files with json.load and use those exact field names; don't print whole files.
-- For totals, averages, rates, rankings, or anything combining more than a few numbers or more than one dataset, run a short python3 script with the bash tool that reads those files and prints a compact result. Then report the printed numbers.
+- Each file is one JSON object: {"dataset", "filters", "fetchedAt", "meta", "rows"}. All rows are in "rows" (the tool result shows only a preview of them), and each row has the field paths listed in the tool result's "fields" (for example "items[].productId" is a list of objects). Read files with json.load and use those exact field names; don't print whole files.
+- For totals, averages, rates, rankings, or anything combining more than a few numbers, run a short python3 script with the bash tool that reads those files and prints a compact result. Then report the printed numbers.
+- Any answer that combines two or more datasets (for example inventory with sales, or returns with sales) MUST be computed with the bash tool, never by matching rows by hand.
+- Never conclude that a product or record is missing, zero or absent from a preview. If a result has a "note" or "previewOnly": true, the preview is partial; check the full file.
 - Example cross-tool questions: return rate per product = units returned ÷ units sold over the same period (join returns items with sales by productId; include every return status unless the employee asks otherwise); low-stock top sellers = join low-stock inventory with sales ranked by units sold.
 - If a command fails, read the error, fix the script, and try again (at most twice). Then explain what failed.
 

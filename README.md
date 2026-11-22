@@ -83,7 +83,10 @@ Inspect workflow runs locally with `npx workflow web`, or in production under **
 pnpm typecheck   # TypeScript, strict (type errors also fail `pnpm build`)
 pnpm lint        # ESLint with eslint-config-next (core-web-vitals + typescript)
 pnpm test        # Vitest unit tests
+pnpm test:e2e   # Playwright end-to-end tests in Chrome, Firefox, Safari, iPhone and Android
 ```
+
+End-to-end tests run against the deployed site by default. Set `E2E_BASE_URL` to test another URL (for example `http://localhost:3000`). The admin tests sign in with the admin password, which they read from `ADMIN_E2E_PASSWORD` (default: the template's demo password). Each chat turn calls the model, so the suite is slow and runs one test at a time.
 
 CI (`.github/workflows/ci.yml`) runs all three on every push and pull request; Vercel builds every push. The tests cover the logic the agents rely on: error classification and message sanitizing, return eligibility (order status, items, quantities), request validation (size limits, dropped `system` messages), exact stream resume at every start index, surfacing failed runs, history trimming, tool input schemas, admin date ranges, and the production webhook URL. Vendored component code (`components/ui`, `components/ai-elements`) is excluded from lint; three untouched starter storefront files report React Compiler rules as warnings so the existing shopping experience stays exactly as provided.
 

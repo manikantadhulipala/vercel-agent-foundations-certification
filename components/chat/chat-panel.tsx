@@ -19,7 +19,7 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
-import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
+import { Suggestion } from "@/components/ai-elements/suggestion";
 import { Button } from "@/components/ui/button";
 import { ToolPending, ToolProblem } from "@/components/chat/tool-states";
 import { useDurableChat } from "@/components/chat/use-durable-chat";
@@ -172,11 +172,24 @@ export function ChatPanel<M extends UIMessage>({
 
       <div className="flex flex-col gap-2 border-t p-3">
         {showSuggestions && (
-          <Suggestions aria-label="Suggested questions">
+          // A plain, keyboard-reachable horizontal scroller (the vendored
+          // scroll-area viewport isn't focusable for keyboard scrolling).
+          <div
+            role="group"
+            aria-label="Suggested questions"
+            tabIndex={0}
+            className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             {suggestions.map((s) => (
-              <Suggestion key={s} suggestion={s} onClick={send} disabled={busy} />
+              <Suggestion
+                key={s}
+                suggestion={s}
+                onClick={send}
+                disabled={busy}
+                className="shrink-0"
+              />
             ))}
-          </Suggestions>
+          </div>
         )}
         <PromptInput onSubmit={handleSubmit}>
           <PromptInputBody>

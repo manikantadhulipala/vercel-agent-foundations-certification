@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ADMIN_COOKIE_NAME, ADMIN_PASSWORD } from "./admin-auth";
 
@@ -9,6 +9,17 @@ const COOKIE_MAX_AGE = 60 * 60 * 24; // 1 day
 // Scoped to "/" (not "/admin") so the admin agent's API routes under
 // /api/admin also receive the session and can reject anonymous callers.
 const COOKIE_PATH = "/";
+
+/**
+ * `Secure` cookies are only sent over HTTPS. Vercel always serves HTTPS; a
+ * local production build (`pnpm start`) is plain HTTP, where Safari would
+ * drop a Secure cookie and sign-in would silently fail.
+ */
+async function isHttpsRequest(): Promise<boolean> {
+  if (process.env.VERCEL) return true;
+  const proto = (await headers()).get("x-forwarded-proto") ?? "";
+  return proto.split(",")[0].trim() === "https";
+}
 
 export async function loginAction(formData: FormData): Promise<void> {
   const password = formData.get("password");
@@ -19,7 +30,7 @@ export async function loginAction(formData: FormData): Promise<void> {
   store.set(ADMIN_COOKIE_NAME, ADMIN_PASSWORD, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: await isHttpsRequest(),
     maxAge: COOKIE_MAX_AGE,
     path: COOKIE_PATH,
   });
