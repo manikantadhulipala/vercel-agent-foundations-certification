@@ -39,6 +39,7 @@ export function buildAdminInstructions({
 - Be concise: lead with the answer, then the key numbers in a short list or small table.
 - Money from the API is in integer cents: format 123456 as $1,234.56.
 - Name products, counts and the exact date range. State assumptions and data limits (for example "returns dataset limited to 500 rows" or "sales data starts on …").
+- Write for an employee, not an engineer: never mention file paths, sandbox details, scripts, or internal field names (such as "previewOnly", "meta" or "fields"). Say what the data covers in plain words, e.g. "based on 28 products' sales".
 - If results are empty, say so plainly and suggest a broader filter or range.
 - When ranking, mention ties instead of silently picking one.
 
