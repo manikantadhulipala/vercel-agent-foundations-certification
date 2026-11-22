@@ -55,7 +55,11 @@ export async function readChatMessages(
     return { ok: false, response: jsonError(400, "Messages are malformed.") };
   }
 
-  const messages = validated.data.filter((m) => m.role !== "system");
+  const messages = validated.data
+    .filter((m) => m.role !== "system")
+    // Earlier turns' reasoning parts are empty for OpenAI models (reasoning is
+    // encrypted); sending them back only triggers provider warnings.
+    .map((m) => ({ ...m, parts: m.parts.filter((p) => p.type !== "reasoning") }));
   if (messages.at(-1)?.role !== "user") {
     return { ok: false, response: jsonError(400, "The last message must come from the user.") };
   }

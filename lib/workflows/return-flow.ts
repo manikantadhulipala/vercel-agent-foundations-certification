@@ -106,7 +106,7 @@ async function preauthorizeRefundStep(
  * a specific deployment. Elsewhere (local, protected previews) the status
  * polling below still delivers the decision.
  */
-function publicCallbackUrl(webhookUrl: string): string {
+export function publicCallbackUrl(webhookUrl: string): string {
   const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL;
   if (process.env.VERCEL_ENV !== "production" || !productionHost) return webhookUrl;
   const url = new URL(webhookUrl);

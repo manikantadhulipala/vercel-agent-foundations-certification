@@ -77,6 +77,16 @@ Open http://localhost:3000. The shopping chat is the robot icon in the header. T
 
 Inspect workflow runs locally with `npx workflow web`, or in production under **Observability → Workflows** in the Vercel dashboard.
 
+### Quality checks
+
+```bash
+pnpm typecheck   # TypeScript, strict (type errors also fail `pnpm build`)
+pnpm lint        # ESLint with eslint-config-next (core-web-vitals + typescript)
+pnpm test        # Vitest unit tests
+```
+
+CI (`.github/workflows/ci.yml`) runs all three on every push and pull request; Vercel builds every push. The tests cover the logic the agents rely on: error classification and message sanitizing, return eligibility (order status, items, quantities), request validation (size limits, dropped `system` messages), exact stream resume at every start index, surfacing failed runs, history trimming, tool input schemas, admin date ranges, and the production webhook URL. Vendored component code (`components/ui`, `components/ai-elements`) is excluded from lint; three untouched starter storefront files report React Compiler rules as warnings so the existing shopping experience stays exactly as provided.
+
 ## Environment variables
 
 See `.env.example`. Never commit real values.
@@ -128,4 +138,6 @@ components/admin/tool-views.tsx         admin data, sandbox and memory views
 - **Return decision callbacks:** in production the callback URL uses the public production domain, because per-deployment URLs sit behind Vercel Deployment Protection and would redirect the store's callback to a login page. On `localhost` and protected preview deployments the store can't reach the app, so the workflow falls back to polling the return status every minute.
 - **Resumable streams** replay the run from the start on the server and skip the chunks the browser already rendered, because the run stores raw model parts while the browser counts UI chunks. This keeps resumed replies exact.
 - **Admin auth** is the template's demo cookie gate. It now also protects the admin API routes; real deployments should replace it with proper authentication.
-- **Model:** `openai/gpt-5-mini` is used because it's available on AI Gateway's free tier with reliable tool calling. Set `AI_MODEL` to change it.
+- **Model:** `openai/gpt-5-mini` with low reasoning effort (faster replies, verified answers unchanged). It's available on AI Gateway's free tier with reliable tool calling. Set `AI_MODEL` to change it.
+- **Throughput:** AI Gateway's free tier allows 5 model requests per minute per team. Model calls retry with backoff for about two minutes, so bursts get slower answers instead of failures; if a run still fails, the chat says so and offers a retry. Add AI Gateway credits for real traffic.
+- **Abuse protection:** the shopping endpoint is public, so in production it should sit behind Vercel Firewall rate limiting or BotID to protect the model budget.
