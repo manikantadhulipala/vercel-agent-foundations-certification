@@ -63,7 +63,7 @@ Verification key:
 | Tool inputs validated; invalid requests, missing records and empty results handled | Zod schemas on every tool; `{ ok: false, reason, message }` results | Code and unit tests |
 | Service failures are not reported as success | Permanent errors return `ok: false`; transient errors retry, then the chat shows a retry notice | Code |
 | Credentials stay on the server; never in tool results or chat messages | `lib/api.ts` (server only), error sanitizing in `lib/agents/shared.ts` | Code and unit tests |
-| No `NEXT_PUBLIC_` secrets; `.env*` ignored by git | `.gitignore`, no `NEXT_PUBLIC_` variables in source | Code |
+| No `NEXT_PUBLIC_` secrets; `.env*` ignored by git | `.gitignore`; the only `NEXT_PUBLIC_` variable is the public site URL | Code |
 | Repository includes setup instructions and env variable names without values | `README.md`, `.env.example` | Not yet tested |
 
 ## Browser coverage
@@ -90,7 +90,9 @@ Last full run (production build of this branch, `E2E_BASE_URL=http://localhost:3
 | Admin wrong password rejected | Pass | Pass | Pass | Pass | Pass |
 | Admin computes in the sandbox, accessibility, sign-out locks the area | Pass | Pass | Pass | Pass | Pass |
 
-Fixed in this change, found by the suite:
+Run against production after the merge (`--retries=0`): **34 of 35 passed** on the first attempt. The one failure was the Android refresh test: the chat request took more than 30 seconds to start, so the test never reached its refresh step. It passed 3 of 3 on a repeat run, and the production logs for that window show no errors or warnings.
+
+Issues the suite found, all fixed:
 - Safari and iPhone: a reload during a reply lost the run id, because WebKit reports the cancelled stream as an error before unloading. The run id is now kept while the run is unfinished.
 - Safari over plain HTTP (local runs): the admin cookie was marked `Secure` and dropped. It is now `Secure` only on HTTPS and always on Vercel.
 - Admin: the saved dataset key now matches the tool result (`rows`), and the agent is told that a preview is partial, so it computes from the full file instead of reporting missing items as zero.
