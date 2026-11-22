@@ -29,3 +29,8 @@ next-env.d.ts
 
 # keep the redacted env template
 !.env.example
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/

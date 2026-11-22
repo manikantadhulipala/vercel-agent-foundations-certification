@@ -187,8 +187,8 @@ export function SandboxCommand({
   const output = [
     `$ ${command}`,
     result?.stdout?.trimEnd(),
-    // Shown in red (ANSI) so failures stand out.
-    result?.stderr?.trim() ? `\u001b[31m${result.stderr.trimEnd()}\u001b[0m` : undefined,
+    // Bright red (ANSI 91) so errors stand out and meet contrast on the dark terminal.
+    result?.stderr?.trim() ? `\u001b[91m${result.stderr.trimEnd()}\u001b[0m` : undefined,
   ]
     .filter(Boolean)
     .join("\n");
@@ -204,6 +204,7 @@ export function SandboxCommand({
               Running…
             </TerminalStatus>
           ) : result ? (
+            // The terminal is dark in both themes, so use the light status colors.
             <span
               className={`flex items-center gap-1 text-xs ${failed ? "text-red-400" : "text-emerald-400"}`}
               role="status"
@@ -213,11 +214,17 @@ export function SandboxCommand({
             </span>
           ) : null}
           <TerminalActions>
-            <TerminalCopyButton />
+            <TerminalCopyButton aria-label="Copy command output" title="Copy command output" />
           </TerminalActions>
         </div>
       </TerminalHeader>
-      <TerminalContent className="max-h-64" />
+      {/* Focusable so keyboard users can scroll long output. */}
+      <TerminalContent
+        className="max-h-64 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
+        tabIndex={0}
+        role="region"
+        aria-label="Command output"
+      />
     </Terminal>
   );
 }

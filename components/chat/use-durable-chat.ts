@@ -186,7 +186,14 @@ export function useDurableChat<M extends UIMessage>({
   // side; the reply itself lives in the durable run until it finishes.
   useEffect(() => {
     if (!session.restored || session.consumeSkipSave()) return;
-    const inFlight = status === "submitted" || status === "streaming";
+    // A run is still in flight while streaming, and also when the connection
+    // broke before its `finish` (the run id is only cleared on finish). Safari,
+    // for example, reports the reload-cancelled stream as an error before the
+    // page unloads; keeping the run id here lets the next load reconnect.
+    const inFlight =
+      status === "submitted" ||
+      status === "streaming" ||
+      (status === "error" && session.activeRunId !== null);
     writeStored<M>(storageKey, {
       version: STORAGE_VERSION,
       messages: inFlight ? upToLastUserMessage(messages) : messages,
